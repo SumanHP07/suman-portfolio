@@ -7,6 +7,9 @@ const inter = Inter({
   display: 'swap',
 })
 
+import Tracker from '@/components/Tracker'
+import AdminShortcut from '@/components/AdminShortcut'
+
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
@@ -60,7 +63,11 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={inter.variable}>
-      <body className="min-h-screen">{children}</body>
+      <body className="min-h-screen">
+        <Tracker />
+        <AdminShortcut />
+        {children}
+      </body>
     </html>
   )
 }
