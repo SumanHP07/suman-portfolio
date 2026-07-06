@@ -93,6 +93,16 @@ export default function Hero() {
             <motion.div variants={fadeUp} initial="hidden" animate="show" transition={{ duration: 0.5, delay: 0.5 }}
               className="flex justify-center md:justify-start">
               <a href="/resume.pdf" download="Suman_HP_Resume.pdf"
+                onClick={() => {
+                  try {
+                    const visitorId = localStorage.getItem('_vid')
+                    fetch('/api/track-resume', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ visitorId, referrer: document.referrer }),
+                    }).catch(() => {})
+                  } catch {}
+                }}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-violet-600 hover:from-brand-500 hover:to-violet-500 text-white font-semibold text-sm transition-all hover:shadow-lg hover:shadow-brand-600/40 group">
                 <FileDown size={16} className="group-hover:animate-bounce" />
                 Download Resume

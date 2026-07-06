@@ -23,21 +23,29 @@ export default function AdminDashboard() {
   const [visits, setVisits]         = useState([])
   const [total, setTotal]           = useState(0)
   const [unique, setUnique]         = useState(0)
+  const [downloads, setDownloads]   = useState([])
+  const [dlTotal, setDlTotal]       = useState(0)
   const [loading, setLoading]       = useState(true)
   const [search, setSearch]         = useState('')
   const [sortField, setSortField]   = useState('created_at')
   const [sortDir, setSortDir]       = useState('desc')
-  const [tab, setTab]               = useState('visitors') // 'visitors' | 'daily'
+  const [tab, setTab]               = useState('visitors') // 'visitors' | 'daily' | 'downloads'
   const router = useRouter()
 
   const fetchData = useCallback(async () => {
     setLoading(true)
-    const res = await fetch('/api/admin/visitors?limit=200')
-    if (res.status === 401) { router.replace('/admin'); return }
-    const data = await res.json()
-    setVisits(data.visits || [])
-    setTotal(data.total || 0)
-    setUnique(data.uniqueVisitors || 0)
+    const [visRes, dlRes] = await Promise.all([
+      fetch('/api/admin/visitors?limit=200'),
+      fetch('/api/admin/resume-downloads'),
+    ])
+    if (visRes.status === 401) { router.replace('/admin'); return }
+    const visData = await visRes.json()
+    const dlData = await dlRes.json()
+    setVisits(visData.visits || [])
+    setTotal(visData.total || 0)
+    setUnique(visData.uniqueVisitors || 0)
+    setDownloads(dlData.downloads || [])
+    setDlTotal(dlData.total || 0)
     setLoading(false)
   }, [router])
 
@@ -123,10 +131,11 @@ export default function AdminDashboard() {
       <div className="px-6 py-8 space-y-8">
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <StatCard label="Total Visits" value={total} />
           <StatCard label="Unique Visitors" value={unique} />
           <StatCard label="Repeat Visits" value={total - unique} sub="same visitor, multiple views" />
+          <StatCard label="Resume Downloads" value={dlTotal} sub="total downloads tracked" />
           <StatCard label="Today" value={
             visits.filter(v => v.created_at?.slice(0, 10) === new Date().toISOString().slice(0, 10)).length
           } sub={new Date().toLocaleDateString()} />
@@ -134,14 +143,14 @@ export default function AdminDashboard() {
 
         {/* Tabs */}
         <div className="flex gap-2 border-b border-white/[0.06] pb-0">
-          {['visitors', 'daily'].map(t => (
+          {['visitors', 'daily', 'downloads'].map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-2.5 text-sm font-semibold rounded-t-xl transition-colors ${
                 tab === t
                   ? 'bg-white/[0.06] text-white border border-white/[0.08] border-b-transparent'
                   : 'text-slate-500 hover:text-slate-300'
               }`}>
-              {t === 'visitors' ? '👥 Visitor Log' : '📈 Daily Chart'}
+              {t === 'visitors' ? '👥 Visitor Log' : t === 'daily' ? '📈 Daily Chart' : '📄 Resume Downloads'}
             </button>
           ))}
         </div>
@@ -245,6 +254,68 @@ export default function AdminDashboard() {
                     </span>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Resume Downloads */}
+        {tab === 'downloads' && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-slate-400 text-sm">
+                <span className="text-white font-bold text-lg">{dlTotal}</span> total resume downloads tracked
+              </p>
+              <button onClick={fetchData}
+                className="px-4 py-2 rounded-xl bg-brand-600/20 border border-brand-600/40 text-brand-300 hover:bg-brand-600/30 text-sm transition-all">
+                Refresh
+              </button>
+            </div>
+
+            {loading ? (
+              <div className="text-center text-slate-500 py-20">Loading...</div>
+            ) : downloads.length === 0 ? (
+              <div className="text-center text-slate-600 py-20 glass rounded-2xl">
+                <p className="text-4xl mb-4">📄</p>
+                <p className="font-semibold text-slate-400">No downloads yet</p>
+                <p className="text-sm mt-1">Downloads will appear here when visitors download your resume</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-2xl border border-white/[0.08]">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-white/[0.08] bg-white/[0.02]">
+                      <th className="text-left px-4 py-3 text-slate-400 font-semibold whitespace-nowrap">#</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-semibold whitespace-nowrap">🕐 Time</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-semibold whitespace-nowrap">🏢 Org / ISP</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-semibold whitespace-nowrap">📍 Location</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-semibold whitespace-nowrap">📱 Device</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-semibold whitespace-nowrap">🌐 Browser</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {downloads.map((d, i) => (
+                      <tr key={d.id || i} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+                        <td className="px-4 py-3 text-slate-600 text-xs">{i + 1}</td>
+                        <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap">
+                          {d.created_at ? new Date(d.created_at).toLocaleString() : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-white font-medium max-w-[200px] truncate">
+                          {d.org || <span className="text-slate-600">Unknown ISP</span>}
+                        </td>
+                        <td className="px-4 py-3 text-slate-300 whitespace-nowrap">
+                          {[d.city, d.country].filter(Boolean).join(', ') || <span className="text-slate-600">—</span>}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getBadgeColor(d.device_type)}`}>
+                            {d.device_type || 'desktop'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap">{d.browser || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
